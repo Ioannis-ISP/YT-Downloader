@@ -1,0 +1,41 @@
+#This one i made
+
+import os
+
+os.system("winget install --id ffmpeg.ffmpeg -e")
+os.system("winget install --id yt-dlp.yt-dlp -e")
+
+print()
+print("Welcome to YT-Downloader")
+print("The Downloaded file will be saved at the folder where this program is.")
+print("--------------")
+
+while True:
+    try:
+        option = int(input( "Select Download format\n" \
+                            "1: Full HD\n" \
+                            "2: mp4\n" \
+                            "3: mp3\n" \
+                            "4: exit downloader\n"))
+    except ValueError:
+        print("Incorrect input")
+        print("----------------")
+        continue
+
+    if option == 4:
+        exit()
+
+    if option not in (1, 2, 3):
+        print("No such option")
+        print("---------------")
+        continue
+
+    if option == 1:
+        url = input("Enter URL: ")
+        os.system(f"yt-dlp -f \"bestvideo[height<=1080]+bestaudio/best[height<=1080]\" --merge-output-format mp4 \"{url}\"")
+    elif option == 2:
+        url = input("Enter URL: ")
+        os.system(f"yt-dlp -f \"bestvideo[height<=360]+bestaudio/best[height<=360]\" --merge-output-format mp4 \"{url}\"")
+    elif option == 3:
+        url = input("Enter URL: ")
+        os.system(f"yt-dlp -x --audio-format mp3 --audio-quality 0 \"{url}\"")
