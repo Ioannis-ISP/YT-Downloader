@@ -1,5 +1,6 @@
-import re
+
 import os
+import re
 import subprocess
 import threading
 import tkinter as tk
@@ -8,10 +9,7 @@ from queue import Queue, Empty
 
 print("Starting YT-Downloader...")
 
-# Download location
 folder = os.getcwd()
-
-# Communication between background threads and GUI
 messages = Queue()
 
 
@@ -21,12 +19,13 @@ def install_tools():
     tools = [
         ["winget", "install", "--id", "ffmpeg.ffmpeg", "-e",
          "--accept-package-agreements", "--accept-source-agreements"],
+
         ["winget", "install", "--id", "yt-dlp.yt-dlp", "-e",
          "--accept-package-agreements", "--accept-source-agreements"]
     ]
 
     for command in tools:
-        messages.put(("log", f"Checking {command[3]}..."))
+        messages.put(("log", f"Checking/installing {command[3]}..."))
 
         try:
             subprocess.run(command, check=False)
@@ -37,6 +36,7 @@ def install_tools():
             return
 
     messages.put(("dependencies_ready", None))
+
 
 # ---------------- DOWNLOAD FUNCTION ----------------
 
@@ -53,9 +53,7 @@ def download():
             "yt-dlp",
             "-P", folder,
             "-f", "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
-            "--merge-output-format", "mp4",
-            "--newline",
-            url
+            "--merge-output-format", "mp4"
         ]
 
     elif choice == "360p":
@@ -63,9 +61,7 @@ def download():
             "yt-dlp",
             "-P", folder,
             "-f", "bestvideo[height<=360]+bestaudio/best[height<=360]",
-            "--merge-output-format", "mp4",
-            "--newline",
-            url
+            "--merge-output-format", "mp4"
         ]
 
     else:
@@ -74,13 +70,24 @@ def download():
             "-P", folder,
             "-x",
             "--audio-format", "mp3",
-            "--audio-quality", "0",
-            "--newline",
-            url
+            "--audio-quality", "0"
         ]
 
-    download_button.config(state="disabled")
+    # Dedicated progress output
+    command += [
+        "--newline",
+        "--progress",
+        "--progress-template",
+        "download:PROGRESS:%(progress._percent_str)s",
+        url
+    ]
+
+    # Reset progress bar
+    progress_var.set(0)
+    progress_label.config(text="0%")
     status_var.set("Downloading...")
+
+    download_button.config(state="disabled")
 
     def run_download():
         try:
@@ -95,7 +102,20 @@ def download():
             )
 
             for line in process.stdout:
-                messages.put(("log", line.rstrip()))
+                line = line.rstrip()
+
+                # Extract download percentage
+                match = re.search(
+                    r"PROGRESS:\s*([0-9]+(?:\.[0-9]+)?)%?",
+                    line
+                )
+
+                if match:
+                    percentage = float(match.group(1))
+                    messages.put(("progress", percentage))
+
+                else:
+                    messages.put(("log", line))
 
             process.wait()
 
@@ -108,6 +128,10 @@ def download():
             messages.put(("log", str(error)))
             messages.put(("download_failed", None))
 
+        except Exception as error:
+            messages.put(("log", str(error)))
+            messages.put(("download_failed", None))
+
     threading.Thread(target=run_download, daemon=True).start()
 
 
@@ -115,14 +139,15 @@ def download():
 
 root = tk.Tk()
 root.title("YT-Downloader")
-root.geometry("600x500")
-root.minsize(500, 400)
+root.geometry("600x520")
+root.minsize(500, 420)
 
-# Main container
 main = ttk.Frame(root, padding=20)
 main.pack(fill="both", expand=True)
 
+
 # Title
+
 ttk.Label(
     main,
     text="YT-Downloader",
@@ -134,13 +159,17 @@ ttk.Label(
     text="Download videos and audio from YouTube"
 ).pack(pady=(0, 20))
 
+
 # URL input
+
 ttk.Label(main, text="YouTube URL:").pack(anchor="w")
 
 url_entry = ttk.Entry(main, font=("Segoe UI", 11))
 url_entry.pack(fill="x", pady=(5, 15))
 
+
 # Format selection
+
 ttk.Label(
     main,
     text="Select download format:"
@@ -159,18 +188,31 @@ for name in ("1080p", "360p", "MP3"):
         value=name
     ).pack(side="left", padx=(0, 20))
 
+
 # Download button
+
 download_button = ttk.Button(
     main,
     text="Download",
     command=download,
     state="disabled"
 )
+
 download_button.pack(fill="x", pady=10)
 
+
 # Status
+
 status_var = tk.StringVar(value="Installing/checking required tools...")
+
+ttk.Label(
+    main,
+    textvariable=status_var
+).pack(anchor="w", pady=5)
+
+
 # Progress bar
+
 progress_var = tk.DoubleVar(value=0)
 
 progress_bar = ttk.Progressbar(
@@ -180,24 +222,28 @@ progress_bar = ttk.Progressbar(
     mode="determinate"
 )
 
-progress_bar.pack(fill="x", pady=10)
+progress_bar.pack(fill="x", pady=5)
 
-progress_label = ttk.Label(main, text="0%")
+progress_label = ttk.Label(
+    main,
+    text="0%",
+    font=("Segoe UI", 10, "bold")
+)
+
 progress_label.pack(anchor="e")
 
-ttk.Label(
-    main,
-    textvariable=status_var
-).pack(anchor="w", pady=5)
 
 # Download location
+
 ttk.Label(
     main,
     text=f"Download location: {folder}",
     wraplength=540
 ).pack(anchor="w", pady=5)
 
+
 # Output log
+
 ttk.Label(main, text="Output:").pack(anchor="w", pady=(10, 5))
 
 log_frame = ttk.Frame(main)
@@ -235,6 +281,10 @@ def process_messages():
                 log_output.see("end")
                 log_output.config(state="disabled")
 
+            elif message == "progress":
+                progress_var.set(data)
+                progress_label.config(text=f"{data:.1f}%")
+
             elif message == "dependencies_ready":
                 status_var.set("Ready!")
                 download_button.config(state="normal")
@@ -243,6 +293,8 @@ def process_messages():
                 status_var.set("Dependency installation failed.")
 
             elif message == "download_finished":
+                progress_var.set(100)
+                progress_label.config(text="100%")
                 status_var.set("Download completed!")
                 download_button.config(state="normal")
 
@@ -256,10 +308,13 @@ def process_messages():
     root.after(100, process_messages)
 
 
-# Start dependency installation in background
-threading.Thread(target=install_tools, daemon=True).start()
+# ---------------- START APPLICATION ----------------
 
-# Start checking messages
+threading.Thread(
+    target=install_tools,
+    daemon=True
+).start()
+
 root.after(100, process_messages)
 
 root.mainloop()
