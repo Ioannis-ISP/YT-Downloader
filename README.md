@@ -21,3 +21,5 @@ Files are saved in the terminal's current working directory.
 Note: This is usually the program's folder when launched from there, but not always. If you paste the code directly into a terminal, downloads are saved in the terminal's current directory.
 #Disclaimer
 This project is for educational purposes. Download content only when you have permission to do so and respect applicable copyright laws and YouTube's terms of service.
+#GUI
+GUI version was made entirely by ChatGPT
